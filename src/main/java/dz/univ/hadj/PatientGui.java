@@ -23,7 +23,8 @@ import java.time.format.DateTimeFormatter;
 
 public class PatientGui extends JFrame {
     private PatientAgent myAgent;
-    private JTextField nameField, resourceField;
+    private JTextField nameField;
+    private JComboBox<String> resourceBox;
     private JComboBox<String> priorityBox; // Ajouté
     private JTextArea logArea;
     public PatientGui(PatientAgent a) {
@@ -38,9 +39,10 @@ public class PatientGui extends JFrame {
         nameField = new JTextField(15);
         p.add(nameField);
         
-        p.add(new JLabel("Besoin (LIT_URGENCE/SCANNER):"));
-        resourceField = new JTextField(15);
-        p.add(resourceField);
+        p.add(new JLabel("Besoin médical:"));
+        String[] services = { "SCANNER", "DIAGNOSTIC", "KINESITHERAPIE", "CONSULTATION" };
+        resourceBox = new JComboBox<>(services);
+        p.add(resourceBox);
 
         // Ajout du menu déroulant pour la priorité
         p.add(new JLabel("Priorité:"));
@@ -59,9 +61,9 @@ public class PatientGui extends JFrame {
         JButton addButton = new JButton("Envoyer la demande");
         addButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent ev) {
-                String name = nameField.getText().trim();
-                String resource = resourceField.getText().trim();
-                String priority = (String) priorityBox.getSelectedItem(); // Récupération de la priorité
+String name = nameField.getText().trim();
+    String resource = (String) resourceBox.getSelectedItem(); // Récupère le choix
+    String priority = (String) priorityBox.getSelectedItem();
 
                 // SÉCURITÉ : Empêcher l'envoi de données vides
                 if (name.isEmpty() || resource.isEmpty()) {
@@ -73,7 +75,7 @@ public class PatientGui extends JFrame {
                 myAgent.envoyerDemande(name, resource, priority);
                 
                 nameField.setText("");
-                resourceField.setText("");
+                // resourceField.setText("");
             }
         });
         

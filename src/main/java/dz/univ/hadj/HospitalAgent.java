@@ -1,83 +1,90 @@
 package dz.univ.hadj;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.Date;
 import java.util.HashMap;
 
+import jade.core.AID;
 import jade.core.Agent;
 import jade.core.behaviours.CyclicBehaviour;
 import jade.lang.acl.ACLMessage;
 
 public class HospitalAgent extends Agent {
-    // Simulation du STOCKAGE (Base de données locale)
     private HashMap<String, Integer> resources = new HashMap<>();
     private HospitalGui myGui;
+
     protected void setup() {
-        // Initialisation des données
-        resources.put("LIT_URGENCE", 5);
-        resources.put("SCANNER", 2);
-// 2. Création et affichage de l'interface graphique
+        // 1. Initialisation des équipements et services
+        resources.put("SCANNER", 5);
+        resources.put("DIAGNOSTIC", 10);
+        resources.put("KINESITHERAPIE", 3);
+        resources.put("CONSULTATION", 20);
+
         myGui = new HospitalGui();
-        System.out.println("--- [Hôpital] Agent de gestion des ressources prêt ---");
+        System.out.println("[Hôpital] Orchestrateur prêt. En attente de patients...");
 
         addBehaviour(new CyclicBehaviour() {
-// Dans le CyclicBehaviour de HospitalAgent
-public void action() {
-    ACLMessage msg = receive();
-    if (msg != null) {
-        String content = msg.getContent();
-        
-        // SECURITÉ : On vérifie si le message est bien formaté "Nom:Ressource"
-        if (content != null && content.contains(":")) {
-            String[] parts = content.split(":");
-            
-// Dans le CyclicBehaviour de HospitalAgent
-if (parts.length >= 3) {
-    String patientName = parts[0];
-    String resourceNeeded = parts[1];
-    String priority = parts[2];
+            public void action() {
+                ACLMessage msg = receive();
+                if (msg != null) {
+                    if (msg.getPerformative() == ACLMessage.REQUEST) {
+                        traiterDemandePatient(msg);
+                    }
+                } else {
+                    block();
+                }
+            }
+        });
+    }
 
-    ACLMessage reply = msg.createReply();
+private void traiterDemandePatient(ACLMessage msgFromPatient) {
+    String[] parts = msgFromPatient.getContent().split(":");
+    String patient = parts[0];
+    String besoin = parts[1];
+    String priorite = parts[2];
 
-// 1. VÉRIFICATION : Est-ce que l'hôpital gère cette ressource ?
-    if (!resources.containsKey(resourceNeeded)) {
+    // --- ENVOI RÉEL AUX AGENTS EXPERTS (Pour le Sniffer) ---
+
+    // 1. Message pour l'agent Équipement
+    ACLMessage msgEquip = new ACLMessage(ACLMessage.QUERY_IF);
+    msgEquip.addReceiver(new AID("Equip", AID.ISLOCALNAME));
+    msgEquip.setContent("Etat:" + besoin);
+    send(msgEquip); // <--- L'ARROU APPARAÎTRA ICI DANS LE SNIFFER
+
+    // 2. Message pour l'agent Staff
+    ACLMessage msgStaff = new ACLMessage(ACLMessage.QUERY_IF);
+    msgStaff.addReceiver(new AID("Staff", AID.ISLOCALNAME));
+    msgStaff.setContent("Dispo:Medecin");
+    send(msgStaff); // <--- DEUXIÈME ARROW ICI
+
+    // --- LOGIQUE DE DÉCISION (Le reste du code ne change pas) ---
+    int stock = resources.getOrDefault(besoin, 0);
+    boolean accorde = (stock > 1 || (priorite.equals("URGENTE") && stock > 0));
+
+    ACLMessage reply = msgFromPatient.createReply();
+    if (accorde) {
+        int nouveauStock = stock - 1;
+        resources.put(besoin, nouveauStock);
+        myGui.updateStock(besoin, nouveauStock);
+        sauvegarderDansCSV(patient, besoin, priorite);
+        reply.setPerformative(ACLMessage.INFORM);
+        reply.setContent("ADMIS : " + besoin + " réservé pour " + patient);
+    } else {
         reply.setPerformative(ACLMessage.FAILURE);
-        reply.setContent("ERREUR : La ressource '" + resourceNeeded + "' n'existe pas dans notre catalogue.");
-    } 
-    else {
-        // 2. Si elle existe, on vérifie le stock et la priorité
-        int dispo = resources.get(resourceNeeded);
-        boolean accorde = false;
-
-        if (priority.equals("URGENTE") && dispo > 0) {
-            accorde = true;
-        } else if (priority.equals("NORMALE") && dispo > 1) {
-            accorde = true;
-        }
-
-        if (accorde) {
-            int nouveauStock = dispo - 1;
-            resources.put(resourceNeeded, nouveauStock);
-            myGui.updateStock(resourceNeeded, nouveauStock);
-            reply.setPerformative(ACLMessage.INFORM);
-            reply.setContent("ADMIS : " + patientName + " (" + priority + ")");
-        } else {
-            // REFUS INTELLIGENT
-            reply.setPerformative(ACLMessage.FAILURE);
-            String raison = (dispo <= 1 && priority.equals("NORMALE")) ? 
-                            "Réservé aux urgences" : "Stock épuisé";
-            reply.setContent("REFUS pour " + patientName + " : " + raison);
-        }
+        reply.setContent("REFUS : Ressource indisponible");
     }
     send(reply);
-} else {
-                System.out.println("[Hôpital] Erreur : Message mal formé (données manquantes).");
-            }
-        } else {
-            System.out.println("[Hôpital] Erreur : Message reçu sans séparateur ':' ");
-        }
-    } else {
-        block();
-    }
 }
-        });
+
+    // Fonction de stockage (Persistance des données)
+    private void sauvegarderDansCSV(String patient, String service, String priorite) {
+        try (FileWriter writer = new FileWriter("historique_hopital.csv", true)) {
+            String ligne = new Date().toString() + "," + patient + "," + service + "," + priorite + "\n";
+            writer.write(ligne);
+            System.out.println("[Stockage] Entrée ajoutée au fichier CSV.");
+        } catch (IOException e) {
+            System.err.println("Erreur stockage : " + e.getMessage());
+        }
     }
 }
