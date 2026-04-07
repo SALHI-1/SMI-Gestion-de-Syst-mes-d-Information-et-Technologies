@@ -9,79 +9,110 @@ import javax.swing.BorderFactory;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.SwingConstants;
 
 public class HospitalGui extends JFrame {
-    // Déclaration des labels pour chaque service
     private JLabel scannerLabel, diagnosticLabel, kineLabel, consultationLabel;
+    private JLabel scannerStatus, diagnosticStatus, kineStatus, consultationStatus;
 
     public HospitalGui() {
-        super("Moniteur des Ressources Hospitalières");
+        super("Moniteur Temps Réel - Système Hospitalier");
         
-        // Configuration de la fenêtre : 4 lignes pour nos 4 services
-        JPanel p = new JPanel(new GridLayout(4, 2, 10, 10));
+        // Grille de 5 lignes (1 header + 4 services) et 3 colonnes
+        JPanel p = new JPanel(new GridLayout(5, 3, 15, 10));
         p.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
+        // --- EN-TÊTES ---
+        p.add(createHeaderLabel("SERVICE"));
+        p.add(createHeaderLabel("STOCK"));
+        p.add(createHeaderLabel("ÉTAT TECHNIQUE"));
+
         // 1. SCANNER
-        p.add(new JLabel("Scanners dispos :"));
-        scannerLabel = createStyledLabel("5"); 
+        p.add(new JLabel("Scanner :"));
+        scannerLabel = createStyledLabel("5");
+        scannerStatus = createStatusLabel("OPÉRATIONNEL");
         p.add(scannerLabel);
+        p.add(scannerStatus);
 
         // 2. DIAGNOSTIC
         p.add(new JLabel("Salles Diagnostic :"));
         diagnosticLabel = createStyledLabel("10");
+        diagnosticStatus = createStatusLabel("OPÉRATIONNEL");
         p.add(diagnosticLabel);
+        p.add(diagnosticStatus);
 
         // 3. KINESITHERAPIE
         p.add(new JLabel("Postes Kiné :"));
         kineLabel = createStyledLabel("3");
+        kineStatus = createStatusLabel("OPÉRATIONNEL");
         p.add(kineLabel);
+        p.add(kineStatus);
 
         // 4. CONSULTATION
-        p.add(new JLabel("Bureaux Consultation :"));
+        p.add(new JLabel("Consultation :"));
         consultationLabel = createStyledLabel("20");
+        consultationStatus = createStatusLabel("OPÉRATIONNEL");
         p.add(consultationLabel);
+        p.add(consultationStatus);
 
         getContentPane().add(p, BorderLayout.CENTER);
         
-        setSize(450, 300); // Fenêtre un peu plus grande pour les 4 lignes
+        setSize(600, 350); // Plus large pour les 3 colonnes
         setResizable(false);
-        setLocationRelativeTo(null); // Centre l'interface au milieu de l'écran
+        setLocationRelativeTo(null);
         setVisible(true); 
     }
 
-    // Petite méthode utilitaire pour éviter de répéter le code de style
+    private JLabel createHeaderLabel(String text) {
+        JLabel l = new JLabel(text, SwingConstants.CENTER);
+        l.setFont(new Font("Arial", Font.BOLD, 12));
+        l.setForeground(Color.GRAY);
+        return l;
+    }
+
     private JLabel createStyledLabel(String text) {
-        JLabel label = new JLabel(text);
+        JLabel label = new JLabel(text, SwingConstants.CENTER);
         label.setFont(new Font("Arial", Font.BOLD, 18));
-        label.setForeground(new Color(0, 102, 204)); // Un bleu professionnel
+        label.setForeground(new Color(0, 102, 204));
         return label;
     }
 
+    private JLabel createStatusLabel(String text) {
+        JLabel label = new JLabel(text, SwingConstants.CENTER);
+        label.setFont(new Font("Arial", Font.ITALIC, 11));
+        label.setForeground(new Color(46, 204, 113)); // Vert par défaut
+        return label;
+    }
+
+    // --- MISE À JOUR DU STOCK ---
     public void updateStock(String ressource, int quantite) {
-        // Mise à jour dynamique selon le nom de la ressource reçue
         switch (ressource) {
-            case "SCANNER":
-                scannerLabel.setText("" + quantite);
-                updateColor(scannerLabel, quantite);
-                break;
-            case "DIAGNOSTIC":
-                diagnosticLabel.setText("" + quantite);
-                updateColor(diagnosticLabel, quantite);
-                break;
-            case "KINESITHERAPIE":
-                kineLabel.setText("" + quantite);
-                updateColor(kineLabel, quantite);
-                break;
-            case "CONSULTATION":
-                consultationLabel.setText("" + quantite);
-                updateColor(consultationLabel, quantite);
-                break;
+            case "SCANNER": scannerLabel.setText(""+quantite); break;
+            case "DIAGNOSTIC": diagnosticLabel.setText(""+quantite); break;
+            case "KINESITHERAPIE": kineLabel.setText(""+quantite); break;
+            case "CONSULTATION": consultationLabel.setText(""+quantite); break;
         }
     }
 
-    // Alerte visuelle : devient rouge s'il ne reste qu'une place ou moins
-    private void updateColor(JLabel label, int qty) {
-        if (qty <= 1) label.setForeground(Color.RED);
-        else label.setForeground(new Color(0, 102, 204));
+    // --- NOUVELLE MÉTHODE : MISE À JOUR DE L'ÉTAT ---
+    public void updateServiceStatus(String ressource, String status) {
+        JLabel target = null;
+        switch (ressource) {
+            case "SCANNER": target = scannerStatus; break;
+            case "DIAGNOSTIC": target = diagnosticStatus; break;
+            case "KINESITHERAPIE": target = kineStatus; break;
+            case "CONSULTATION": target = consultationStatus; break;
+        }
+
+        if (target != null) {
+            target.setText(status.toUpperCase());
+            if (status.equalsIgnoreCase("OUI") || status.equalsIgnoreCase("OPÉRATIONNEL")) {
+                target.setText("OPÉRATIONNEL");
+                target.setForeground(new Color(46, 204, 113)); // Vert
+            } else {
+                target.setText("EN PANNE / INDISPO");
+                target.setForeground(Color.RED); // Rouge
+            }
+        }
     }
 }

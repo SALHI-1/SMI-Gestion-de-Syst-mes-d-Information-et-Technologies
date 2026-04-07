@@ -14,7 +14,7 @@ public class EquipmentAgent extends Agent {
                 if (msg != null && msg.getPerformative() == ACLMessage.QUERY_IF) {
                     ACLMessage reply = msg.createReply();
                     reply.setPerformative(ACLMessage.INFORM);
-                    reply.setContent("OUI"); // Simule : Matériel en bon état
+                    reply.setContent("NON"); // Simule : Matériel en mauvaise état
                     send(reply);
                 } else {
                     block();
