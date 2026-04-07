@@ -21,33 +21,35 @@ public class HospitalAgent extends Agent {
     private boolean staffStatus = false;
     private boolean equipStatus = false;
 
-    protected void setup() {
-        resources.put("SCANNER", 5);
-        resources.put("DIAGNOSTIC", 10);
-        resources.put("KINESITHERAPIE", 3);
-        resources.put("CONSULTATION", 20);
+protected void setup() {
+    resources.put("SCANNER", 5);
+    resources.put("DIAGNOSTIC", 10);
+    resources.put("KINESITHERAPIE", 3);
+    resources.put("CONSULTATION", 20);
 
-        myGui = new HospitalGui();
-        System.out.println("[Hôpital] Orchestrateur Dynamique prêt.");
+    myGui = new HospitalGui();
+    System.out.println("[Hôpital] Initialisation du tableau de bord...");
 
-        addBehaviour(new CyclicBehaviour() {
-            public void action() {
-                ACLMessage msg = receive();
-                if (msg != null) {
-                    // CAS 1 : C'est un Patient qui demande
-                    if (msg.getPerformative() == ACLMessage.REQUEST) {
-                        lancerVerificationDynamique(msg);
-                    } 
-                    // CAS 2 : C'est un Expert qui répond (INFORM)
-                    else if (msg.getPerformative() == ACLMessage.INFORM) {
-                        collecterReponseExpert(msg);
-                    }
-                } else {
-                    block();
+    // --- NOUVEAU : On vérifie l'état AVANT l'arrivée des patients ---
+    envoyerRequete("Equip", "INITIAL_CHECK");
+    envoyerRequete("Staff", "INITIAL_CHECK");
+
+    addBehaviour(new CyclicBehaviour() {
+        public void action() {
+            ACLMessage msg = receive();
+            if (msg != null) {
+                if (msg.getPerformative() == ACLMessage.REQUEST) {
+                    lancerVerificationDynamique(msg);
+                } 
+                else if (msg.getPerformative() == ACLMessage.INFORM) {
+                    collecterReponseExpert(msg);
                 }
+            } else {
+                block();
             }
-        });
-    }
+        }
+    });
+}
 
 private void lancerVerificationDynamique(ACLMessage msg) {
     this.currentPatientMsg = msg;
@@ -79,27 +81,37 @@ private void envoyerRequete(String agentName, String content) {
     send(request);
 }
 
-    private void collecterReponseExpert(ACLMessage msg) {
-        String sender = msg.getSender().getLocalName();
-        String content = msg.getContent();
+private void collecterReponseExpert(ACLMessage msg) {
+    String sender = msg.getSender().getLocalName();
+    String content = msg.getContent();
 
-        if (sender.equals("Equip")) {
-            equipStatus = content.equalsIgnoreCase("OUI");
-            equipResponseReceived = true;
-            // Mise à jour visuelle immédiate
-            myGui.updateServiceStatus("SCANNER", content);
-        } else if (sender.equals("Staff")) {
-            staffStatus = content.equalsIgnoreCase("OUI");
-            staffResponseReceived = true;
-            // On considère que Staff gère la consultation visuellement
-            myGui.updateServiceStatus("CONSULTATION", content);
-        }
-
-        // On ne décide que lorsqu'on a les DEUX réponses
-        if (staffResponseReceived && equipResponseReceived && currentPatientMsg != null) {
-            finaliserDecisionDynamique();
-        }
+    if (sender.equals("Equip")) {
+        equipStatus = content.equalsIgnoreCase("OUI");
+        equipResponseReceived = true;
+        // Met à jour le scanner
+        myGui.updateServiceStatus("SCANNER", content);
+    } 
+    else if (sender.equals("Staff")) {
+        staffStatus = content.equalsIgnoreCase("OUI");
+        staffResponseReceived = true;
+        // Met à jour les services RH
+        myGui.updateServiceStatus("CONSULTATION", content);
+        myGui.updateServiceStatus("KINESITHERAPIE", content);
     }
+
+    // --- CORRECTION ICI : Mise à jour logique du Diagnostic ---
+    // Le diagnostic n'est "OUI" (vert) que si les DEUX sont OK
+    if (equipStatus && staffStatus) {
+        myGui.updateServiceStatus("DIAGNOSTIC", "OUI");
+    } else {
+        myGui.updateServiceStatus("DIAGNOSTIC", "NON");
+    }
+
+    // Condition pour finaliser la décision si un patient attend
+    if (staffResponseReceived && equipResponseReceived && currentPatientMsg != null) {
+        finaliserDecisionDynamique();
+    }
+}
 
     private void finaliserDecisionDynamique() {
         String[] parts = currentPatientMsg.getContent().split(":");
